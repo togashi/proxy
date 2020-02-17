@@ -40,6 +40,7 @@ function setup(server, options) {
 	if (!server) server = http.createServer();
 	server.on('request', onrequest);
 	server.on('connect', onconnect);
+	server.options = options || {};
 	return server;
 }
 
@@ -124,6 +125,15 @@ function onrequest(req, res) {
 			return;
 		}
 		if (!auth) return requestAuthorization(req, res);
+
+		if (server.options &&
+			server.options.shouldInterruptRequest &&
+			typeof server.options.shouldInterruptRequest === 'function' &&
+			server.options.shouldInterruptRequest(req, res)
+		) {
+			return
+		}
+
 		var parsed = url.parse(req.url);
 
 		// proxy the request HTTP method
@@ -314,6 +324,8 @@ function onconnect(req, socket, head) {
 		!head || 0 == head.length,
 		'"head" should be empty for proxy requests'
 	);
+	
+	var server = this;
 
 	var res;
 	var target;
@@ -414,6 +426,15 @@ function onconnect(req, socket, head) {
 
 	authenticate(this, req, function(err, auth) {
 		socket.resume();
+
+		if (server.options &&
+			server.options.shouldInterruptConnect &&
+			typeof server.options.shouldInterruptConnect === 'function' &&
+			server.options.shouldInterruptConnect(req, res)
+		) {
+			return
+		}
+
 		if (err) {
 			// an error occured during login!
 			res.writeHead(500);
